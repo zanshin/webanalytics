@@ -20,7 +20,7 @@ If you want web analytics, you can use one or more of several third party servic
 
 Webanalytics is broken into two parts. The server side application and the javascript.
 
-###Server side application
+### Server side application
 If you have already set up your $GOPATH and added $GOPATH/bin to your $PATH you should:
 - Create a postgres user and database for webanalytics.
 - run "go get github.com/roberttstephens/webanalytics" without quotation marks.
