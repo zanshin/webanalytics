@@ -1,23 +1,36 @@
-package main
+package persist
 
 import (
 	"database/sql"
 	"fmt"
-	_ "github.com/lib/pq"
 	"log"
+
+	// _ "github.com/lib/pq"
+	_ "github.com/go-sql-driver/mysql"
+
+	"github.com/zanshin/webanalytics/dbconf"
+	"github.com/zanshin/webanalytics/metrics"
 )
 
-func Db(dbConfig DbConfig) *sql.DB {
-	db, err := sql.Open("postgres",
-		fmt.Sprintf("user=%s password=%s host=%s dbname=%s", dbConfig.User,
-			dbConfig.Pass, dbConfig.Host, dbConfig.Name))
+func Db(dbConfig dbconf.DbConfig) *sql.DB {
+	fmt.Println("reached func DB in persist")
+	db, err := sql.Open("mysql",
+		fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
+			dbConfig.User, dbConfig.Pass, dbConfig.Host, dbConfig.Port, dbConfig.Name))
+
+	fmt.Println("sql.Open completed in persist")
+	defer db.Close()
+
+	// fmt.Sprintf("user=%s password=%s host=%s dbname=%s", dbConfig.User,
+	// 	dbConfig.Pass, dbConfig.Host, dbConfig.Name))
 	if err != nil {
 		log.Fatal("Unable to connect to the database: ", err)
 	}
 	return db
 }
 
-func SetPageViews(db *sql.DB, pageViews []PageView) {
+func SetPageViews(db *sql.DB, pageViews []metrics.PageView) {
+	fmt.Println("reached func SetPageViews in persist")
 	if len(pageViews) < 1 {
 		return
 	}
@@ -41,7 +54,8 @@ func SetPageViews(db *sql.DB, pageViews []PageView) {
 	tx.Commit()
 }
 
-func SetHrefClicks(db *sql.DB, hrefClicks []HrefClick) {
+func SetHrefClicks(db *sql.DB, hrefClicks []metrics.HrefClick) {
+	fmt.Println("reached func SetHrefClicks in persist")
 	if len(hrefClicks) < 1 {
 		return
 	}
