@@ -2,10 +2,10 @@
     "batchInsertSeconds": 2,
     "port": 8080,
     "database": {
-        "host": "127.0.0.1",
-        "port": 5432,
-        "user": "webanalytics",
-        "pass": "webanalytics",
+        "host": "http:\/\/localhost",
+        "port": 3306,
+        "user": "web_analytics",
+        "pass": "bpiQfZyHV6aYPsJRXjrx",
         "name": "webanalytics"
     }
 }

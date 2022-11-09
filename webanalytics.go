@@ -11,62 +11,36 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/zanshin/webanalytics/dbconf"
+	"github.com/zanshin/webanalytics/metrics"
+	"github.com/zanshin/webanalytics/persist"
 )
 
 // Config contains the main configuration settings for the application.
 type Config struct {
-	BatchInsertSeconds int      `json:"batchInsertSeconds"`
-	Port               int      `json:"port"`
-	DbConfig           DbConfig `json:"database"`
+	BatchInsertSeconds int             `json:"batchInsertSeconds"`
+	Port               int             `json:"port"`
+	DbConfig           dbconf.DbConfig `json:"database"`
 }
 
 var configFilePath string
-
-// DbConfig contains the database settings.
-type DbConfig struct {
-	Host string `json:"host"`
-	Port int    `json:"port"`
-	User string `json:"user"`
-	Pass string `json:"pass"`
-	Name string `json:"name"`
-}
-
-type HrefClick struct {
-	IPAddress  string `json:"ipAddress"`
-	URL        string `json:"url"`
-	Href       string `json:"href"`
-	HrefTop    int    `json:"hrefTop"`
-	HrefRight  int    `json:"hrefRight"`
-	HrefBottom int    `json:"hrefBottom"`
-	HrefLeft   int    `json:"hrefLeft"`
-}
-
-var hrefClicks []HrefClick
-
-type PageView struct {
-	Domain       string `json:"domain"`
-	IPAddress    string `json:"ipAddress"`
-	URL          string `json:"url"`
-	UserAgent    string `json:"userAgent"`
-	ScreenHeight int    `json:"screenHeight"`
-	ScreenWidth  int    `json:"screenWidth"`
-}
-
-var pageViews []PageView
+var hrefClicks []metrics.HrefClick
+var pageViews []metrics.PageView
 
 func listenForRecords(db *sql.DB, seconds time.Duration) {
 	// Run every x seconds.
 	for range time.Tick(seconds) {
 		// Handle page views.
-		newPageViews := make([]PageView, len(pageViews))
+		newPageViews := make([]metrics.PageView, len(pageViews))
 		copy(newPageViews, pageViews)
-		go SetPageViews(db, newPageViews)
+		go persist.SetPageViews(db, newPageViews)
 		pageViews = pageViews[0:0]
 
 		// Handle href clicks.
-		newHrefClicks := make([]HrefClick, len(hrefClicks))
+		newHrefClicks := make([]metrics.HrefClick, len(hrefClicks))
 		copy(newHrefClicks, hrefClicks)
-		go SetHrefClicks(db, newHrefClicks)
+		go persist.SetHrefClicks(db, newHrefClicks)
 		hrefClicks = hrefClicks[0:0]
 	}
 }
@@ -77,7 +51,7 @@ func IPAddress(remoteAddr string) string {
 }
 
 func hrefClickHandler(w http.ResponseWriter, r *http.Request, body []byte) {
-	hrefClick := HrefClick{}
+	hrefClick := metrics.HrefClick{}
 	if err := json.Unmarshal(body, &hrefClick); err != nil {
 		log.Println("Unable to unmarshal hrefClick: ", err)
 	}
@@ -88,7 +62,7 @@ func hrefClickHandler(w http.ResponseWriter, r *http.Request, body []byte) {
 }
 
 func pageViewsHandler(w http.ResponseWriter, r *http.Request, body []byte) {
-	pageView := PageView{}
+	pageView := metrics.PageView{}
 	if err := json.Unmarshal(body, &pageView); err != nil {
 		log.Println("Unable to unmarshal pageView: ", err)
 	}
@@ -159,7 +133,7 @@ func makeHandler(fn func(http.ResponseWriter, *http.Request, []byte)) http.Handl
 
 func init() {
 	goPath := os.Getenv("GOPATH")
-	defaultConfigPath := fmt.Sprintf("%s/src/github.com/roberttstephens/webanalytics/config.json", goPath)
+	defaultConfigPath := fmt.Sprintf("%s/src/github.com/zanshin/webanalytics/config.json", goPath)
 	flag.StringVar(&configFilePath, "config", defaultConfigPath, "path to config.json")
 }
 
@@ -167,12 +141,17 @@ func main() {
 	// Read the config, initialize the database and listen for records.
 	flag.Parse()
 	config := readConfig(configFilePath)
-	db := Db(config.DbConfig)
+	db := persist.Db(config.DbConfig)
 	seconds := time.Duration(config.BatchInsertSeconds) * time.Second
+
+	fmt.Println("about to listenForRecords")
 	go listenForRecords(db, seconds)
 
 	// Create the handlers for page-view/ and href-click/ POSTs
+	fmt.Println("how about some HandleFuncs")
 	http.HandleFunc("/page-views/", makeHandler(pageViewsHandler))
 	http.HandleFunc("/href-click/", makeHandler(hrefClickHandler))
+
+	fmt.Println("ListenAndServe")
 	http.ListenAndServe(fmt.Sprintf(":%d", config.Port), nil)
 }
